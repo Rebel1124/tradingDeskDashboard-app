@@ -630,7 +630,7 @@ myInterval = dcc.Interval(
 
 myIntervalReal = dcc.Interval(
     id='interval-component-real',
-    interval=1*1000, # in milliseconds
+    interval=10*1000, # in milliseconds
     n_intervals=0
 )
 
