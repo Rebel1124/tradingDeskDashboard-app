@@ -1,0 +1,13 @@
+beautifulsoup4==4.12.3
+dash==2.17.0
+dash_bootstrap_components==1.6.0
+gnews==0.3.7
+luno_python==0.0.10
+pandas==2.2.2
+plotly==5.20.0
+python-dotenv==1.0.1
+requests==2.31.0
+valr_python==0.2.7
+yfinance==0.2.40
+gunicorn
+dash-tools
