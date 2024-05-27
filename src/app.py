@@ -1428,7 +1428,7 @@ def update_graph_live(n):
         x=df.index,
         y=df['ZARUSD'],
         name='ZAR/USD',
-        line_color='darkblue',
+        line_color='darkgreen',
         showlegend=False,
         opacity=.5
     ))
