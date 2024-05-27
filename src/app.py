@@ -14,12 +14,12 @@ import datetime
 from datetime import time, timedelta
 import yfinance as yf
 import time
-from dotenv import load_dotenv
-import os
+#from dotenv import load_dotenv
+#import os
 
 
 #Load env file and connect api's
-load_dotenv()
+#load_dotenv()
 
 # Load Luno Client
 # lunoClient = Client(api_key_id=os.getenv('LUNO_API_KEY_ID'),
@@ -63,8 +63,8 @@ def candles(currencyPairs, timeLag):
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id=os.getenv('LUNO_API_KEY_ID'),
-            api_key_secret=os.getenv('LUNO_API_KEY_SECRET'))
+    lunoClient = Client(api_key_id='nycksryzatzpj',
+            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
 
     my_datetime = datetime.datetime.now() - timedelta(hours=timeLag, minutes=0)
     unix=int(time.mktime(my_datetime .timetuple()) * 1000)
@@ -116,8 +116,8 @@ def premiumCalcs(allCandles, allCurrencies):
 def getValrUSDTOrders():
     from valr_python import Client
 
-    valrClient = Client(api_key='VALR_API_KEY_ID',
-           api_secret='VALR_API_KEY_SECRET')
+    valrClient = Client(api_key='38a8353ed7f8c72e058b645c43b739bb092e7846822f88d411dcf96cb6de4169',
+           api_secret='3b6017e2817c4804c66369e8770670c825615a6f0a04211327a6d674bc137142')
     
     order_book=valrClient.get_order_book_public('USDTZAR')
 
@@ -162,8 +162,8 @@ def getUsdtValrPrices(order_book, vol=0):
 def getValrBTCOrders():
     from valr_python import Client
 
-    valrClient = Client(api_key='VALR_API_KEY_ID',
-           api_secret='VALR_API_KEY_SECRET')
+    valrClient = Client(api_key='38a8353ed7f8c72e058b645c43b739bb092e7846822f88d411dcf96cb6de4169',
+           api_secret='3b6017e2817c4804c66369e8770670c825615a6f0a04211327a6d674bc137142')
     
     order_book=valrClient.get_order_book_public('BTCZAR')
 
@@ -209,8 +209,8 @@ def getLunoUSDTOrders():
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id=os.getenv('LUNO_API_KEY_ID'),
-            api_key_secret=os.getenv('LUNO_API_KEY_SECRET'))
+    lunoClient = Client(api_key_id='nycksryzatzpj',
+            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
     
     # USDTZAR
     order_book = lunoClient.get_order_book_full('USDTZAR')
@@ -257,8 +257,8 @@ def getLunoBTCOrders():
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id=os.getenv('LUNO_API_KEY_ID'),
-            api_key_secret=os.getenv('LUNO_API_KEY_SECRET'))
+    lunoClient = Client(api_key_id='nycksryzatzpj',
+            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
     # BTCZAR
     order_book = lunoClient.get_order_book_full('XBTZAR')
 
