@@ -14,19 +14,7 @@ import datetime
 from datetime import time, timedelta
 import yfinance as yf
 import time
-#from dotenv import load_dotenv
-#import os
 
-
-#Load env file and connect api's
-#load_dotenv()
-
-# Load Luno Client
-# lunoClient = Client(api_key_id=os.getenv('LUNO_API_KEY_ID'),
-#             api_key_secret=os.getenv('LUNO_API_KEY_SECRET'))
-
-# valrClient = Client(api_key='38a8353ed7f8c72e058b645c43b739bb092e7846822f88d411dcf96cb6de4169',
-#            api_secret='3b6017e2817c4804c66369e8770670c825615a6f0a04211327a6d674bc137142')
 
 s=requests.session()
 
