@@ -419,8 +419,8 @@ countryProvider = [
     dbc.CardHeader("Provider",style={"color": "WhiteSmoke","background-color": "DarkSeaGreen", "font-size":'15px'}, id='countryProviderHeader', className="text-center"),
     dbc.CardBody(
         [
-            html.H1("COUNTRY", style={"color": "MidnightBlue", "font-size": "12px"}, className="card-title text-center"),
-            html.P("Premium",style={"color": "MidnightBlue","font-size": "9px", "margin-left":"4px","margin-bottom":"0px", 'margin-top':'21px'}, className="card-text text-center"),
+            html.H1("COUNTRY", style={"color": "MidnightBlue", "font-size": "12px", 'margin-top':'13px'}, className="card-title text-center"),
+            html.P("Premium",style={"color": "MidnightBlue","font-size": "9px", "margin-left":"4px","margin-bottom":"0px", 'margin-top':'5px'}, className="card-text text-center"),
         ], style={"color": "white" ,"background-color": "lavenderblush"}, id='countryProviderBody'
     ),
 ]
