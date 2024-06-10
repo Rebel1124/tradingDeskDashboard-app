@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import requests
 import datetime
 from datetime import time, timedelta
-import yfinance as yf
+# import yfinance as yf
 import time
 # from dotenv import load_dotenv
 # import os
