@@ -632,13 +632,13 @@ myInterval = dcc.Interval(
 
 myIntervalReal = dcc.Interval(
     id='interval-component-real',
-    interval=2*1000, # in milliseconds
+    interval=6*1000, # in milliseconds
     n_intervals=0
 )
 
 myIntervalPolygon= dcc.Interval(
     id='interval-component-poly',
-    interval=2*1000, # in milliseconds
+    interval=6*1000, # in milliseconds
     n_intervals=0
 )
 
