@@ -385,6 +385,7 @@ figFwdPoints.update_layout(margin=dict(l=0, r=0, b=0,t=0), width=385, height=50)
 
 ###Dash Components
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
+server = app.server
 
 mytitle = dcc.Markdown(id='my-title', children='Luno Trading Dashboard')
 usdtZar = dcc.Graph(id='usdtZar', figure={})
