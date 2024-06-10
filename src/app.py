@@ -87,6 +87,7 @@ def candles(currencyPairs, timeLag):
         candlesPair = pd.DataFrame(tradesPair['candles'])
         candlesPair['timestamp']=candlesPair.apply(lambda x: datetime.datetime.fromtimestamp((x['timestamp']/1000)), axis=1)
         candlesPair.rename(columns={'timestamp':'time'}, inplace=True)
+        candlesPair['time'] = candlesPair.apply(lambda x: (x['time'] + timedelta(hours=2)), axis=1)
         candlesPair['time'] = candlesPair.apply(lambda x: datetime.datetime.time(x['time']), axis=1)
         candlesPair.index = candlesPair['time']
         candlesPair = candlesPair.drop(['time'], axis=1, errors='ignore')
@@ -111,6 +112,7 @@ def currencyUSD(tickerStrings):
     df = pd.DataFrame(response.json()['results'])
 
     df['t'] = df.apply(lambda x: datetime.datetime.fromtimestamp((x['t']/1000)), axis=1)
+    df't'] = df.apply(lambda x: (x['t'] + timedelta(hours=2)), axis=1)
     df.index = df.apply(lambda x: datetime.datetime.time(x['t']), axis=1)
     df = df[['c']]
     df.rename(columns={'c':'ZARUSD'}, inplace=True)
