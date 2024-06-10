@@ -112,7 +112,7 @@ def currencyUSD(tickerStrings):
     df = pd.DataFrame(response.json()['results'])
 
     df['t'] = df.apply(lambda x: datetime.datetime.fromtimestamp((x['t']/1000)), axis=1)
-    df't'] = df.apply(lambda x: (x['t'] + timedelta(hours=2)), axis=1)
+    df['t'] = df.apply(lambda x: (x['t'] + timedelta(hours=2)), axis=1)
     df.index = df.apply(lambda x: datetime.datetime.time(x['t']), axis=1)
     df = df[['c']]
     df.rename(columns={'c':'ZARUSD'}, inplace=True)
