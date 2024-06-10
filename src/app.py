@@ -1,39 +1,53 @@
 # Import Libraries
 import dash
 from dash import html, callback, Input, Output
-from dash.dependencies import Input, Output
 import dash_bootstrap_components as dbc
+import dash_extensions as de
 import random
 from gnews import GNews
 from dash import dcc
 import pandas as pd
 import plotly.graph_objects as go
 import requests
-from bs4 import BeautifulSoup
 import datetime
 from datetime import time, timedelta
 import yfinance as yf
 import time
+# from dotenv import load_dotenv
+# import os
+import websockets
+import asyncio
+import json
+
+#Load env file and connect api's
+# load_dotenv()
+#s=requests.session()
+
+#API/Websocket Definitions
+
+# headersB2C2 = {'Authorization': 'Token %s' % os.getenv('B2C2_API_KEY')}
+
+# data = {
+#       "event": "subscribe",
+#       "instrument": "USTZAR.SPOT",
+#       "levels": [100000, 200000, 300000, 400000, 500000],
+# }
 
 
-s=requests.session()
+headersPolygon={"action":"auth","params":"8_S7qgUpBMoVy2KrpSuG8pEn58GcYoq5"}
+authenticatePolygon = {"action":"auth","params":"8_S7qgUpBMoVy2KrpSuG8pEn58GcYoq5"}
+pricesPolygon={"action":"subscribe","params":"C.C:USD-ZAR"}
+
+## Lottie File
+options=dict(loop=True, autoplay=True, rendererSettings=dict(preserveAspectRatio='xMidYMid slice'))
+lottieUrl = 'assets/animation.json'
 
 #Define variables
 
-offshoreBid100 = 18.45
-offshoreBid200 = 18.55
-offshoreBid300 = 18.65
-offshoreBid400 = 18.75
-offshoreBid500 = 18.85
-
-offshoreOffer100 = 18.55
-offshoreOffer200 = 18.65
-offshoreOffer300 = 18.75
-offshoreOffer400 = 18.85
-offshoreOffer500 = 18.95
-
 # Plotly graph themes
 theme='simple_white'
+# bg_color='ghostwhite'
+# plot_bgColor='snow'
 
 #Plotly image path
 image_path = 'assets/lunoLogo.png'
@@ -42,8 +56,16 @@ image_path = 'assets/lunoLogo.png'
 timeLag=3
 currencyPairs=['USDTZAR', 'XBTZAR']
 
-#Yahoo finance tickers
-tickerStrings=['ZAR=X']
+#polygon finance tickers
+
+date1 = datetime.datetime.now().date()
+date2 = date1 - timedelta(days=1)
+
+date1String = date1.strftime('%Y-%m-%d')
+date2String = date2.strftime('%Y-%m-%d')
+
+limit=300
+tickerStrings='USDZAR'
 
 #Market Data Functions
 def candles(currencyPairs, timeLag):
@@ -51,8 +73,8 @@ def candles(currencyPairs, timeLag):
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id='nycksryzatzpj',
-            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
+    lunoClient = Client(api_key_id='fwvhrp3b8vxz3',
+            api_key_secret='-4wbK_Omum74KAS6Oe_bz9unR6-qhDmpbjqMY15_2uU')
 
     my_datetime = datetime.datetime.now() - timedelta(hours=timeLag, minutes=0)
     unix=int(time.mktime(my_datetime .timetuple()) * 1000)
@@ -77,21 +99,23 @@ def candles(currencyPairs, timeLag):
 
     return allCandles
 
+
 def currencyUSD(tickerStrings):
-    data = yf.download(tickerStrings, period="1d", interval='1m')
-    data=data.ffill()
-    data=data.dropna()
-    data.index = data.index.tz_localize(None)
-    data.index = data.index + timedelta(hours=2, minutes=0)
-    dt = data.index
-    zar = data['Close'].values
 
-    allCurrencies=pd.DataFrame(data={'time': dt, 'ZARUSD':zar})
-    allCurrencies['time'] = allCurrencies.apply(lambda x: datetime.datetime.time(x['time']), axis=1)
-    allCurrencies.index = allCurrencies['time']
-    allCurrencies = allCurrencies.drop(['time'], axis=1, errors='ignore')
+    urlAdj = 'https://api.polygon.io/v2/aggs/ticker/C:'+tickerStrings+'/range/1/minute/'+date2String+'/'+date1String+'?adjusted=true&sort=desc&limit='+str(limit)+'&apiKey='+'8_S7qgUpBMoVy2KrpSuG8pEn58GcYoq5'
 
-    return allCurrencies
+    headers = {"accept": "application/json"}
+
+    response = requests.get(urlAdj, headers=headers)
+
+    df = pd.DataFrame(response.json()['results'])
+
+    df['t'] = df.apply(lambda x: datetime.datetime.fromtimestamp((x['t']/1000)), axis=1)
+    df.index = df.apply(lambda x: datetime.datetime.time(x['t']), axis=1)
+    df = df[['c']]
+    df.rename(columns={'c':'ZARUSD'}, inplace=True)
+
+    return df
 
 def premiumCalcs(allCandles, allCurrencies):
     dfAll = pd.concat([allCandles, allCurrencies], axis=1)
@@ -104,13 +128,12 @@ def premiumCalcs(allCandles, allCurrencies):
 def getValrUSDTOrders():
     from valr_python import Client
 
-    valrClient = Client(api_key='38a8353ed7f8c72e058b645c43b739bb092e7846822f88d411dcf96cb6de4169',
-           api_secret='3b6017e2817c4804c66369e8770670c825615a6f0a04211327a6d674bc137142')
+    valrClient = Client(api_key='c861ab5c93a4c248d5b35fbe4cdbd2fdb81e9e4386963ead1fbe78e5cffbc60d',
+           api_secret='9732202d056408a162b52097a9b6bc29c24ad3da1c67bcb788100fb5d434cbd7')
     
     order_book=valrClient.get_order_book_public('USDTZAR')
 
     return order_book
-
 
 def getUsdtValrPrices(order_book, vol=0):
     #Bids
@@ -146,12 +169,11 @@ def getUsdtValrPrices(order_book, vol=0):
     return valrUsdtBid, valrUsdtOffer
 
 
-
 def getValrBTCOrders():
     from valr_python import Client
 
-    valrClient = Client(api_key='38a8353ed7f8c72e058b645c43b739bb092e7846822f88d411dcf96cb6de4169',
-           api_secret='3b6017e2817c4804c66369e8770670c825615a6f0a04211327a6d674bc137142')
+    valrClient = Client(api_key='c861ab5c93a4c248d5b35fbe4cdbd2fdb81e9e4386963ead1fbe78e5cffbc60d',
+           api_secret='9732202d056408a162b52097a9b6bc29c24ad3da1c67bcb788100fb5d434cbd7')
     
     order_book=valrClient.get_order_book_public('BTCZAR')
 
@@ -190,15 +212,13 @@ def getBtcValrPrices(order_book, vol=0):
 
     return valrBtcBid, valrBtcOffer
 
-
-
 # Luno Live Prices
 def getLunoUSDTOrders():
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id='nycksryzatzpj',
-            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
+    lunoClient = Client(api_key_id='fwvhrp3b8vxz3',
+            api_key_secret='-4wbK_Omum74KAS6Oe_bz9unR6-qhDmpbjqMY15_2uU')
     
     # USDTZAR
     order_book = lunoClient.get_order_book_full('USDTZAR')
@@ -245,8 +265,8 @@ def getLunoBTCOrders():
     from luno_python.client import Client
 
     # Load Luno Client
-    lunoClient = Client(api_key_id='nycksryzatzpj',
-            api_key_secret='lBPC-3HhEzndwDLAdte443WtmVoYI8ekCIq1Y-e4vwE')
+    lunoClient = Client(api_key_id='fwvhrp3b8vxz3',
+            api_key_secret='-4wbK_Omum74KAS6Oe_bz9unR6-qhDmpbjqMY15_2uU')
     # BTCZAR
     order_book = lunoClient.get_order_book_full('XBTZAR')
 
@@ -282,35 +302,55 @@ def getBtcLunoPrices(order_book, vol=0):
 
     return lunoBtcBid, lunoBtcOffer
 
-# FX Live Prices
-def getLiveInvesting():
+# Polygon Live Prices
 
-    # Investing.com Live Prices
-    try:
-        url='https://www.investing.com/currencies/live-currency-cross-rates'
-        response=s.get(url)
-        soup = BeautifulSoup(response.text, "html.parser")
-        asking= float(soup.find('div', {'class': 'pid-17-ask innerContainer'}).text)
-        bidding= float(soup.find('div', {'class': 'pid-17-bid innerContainer'}).text)
-    except:
-        bidding=1.0000
-        asking=1.0000
-
-
-    #OctaFx Live Prices
-    # try:
-    #     url='https://www.octafx.com/markets/quotes/mt4/?symbol=USD'
-    #     response=s.get(url)
-    #     soup = BeautifulSoup(response.text, "html.parser")
-    #     ask= soup.find_all('td',{"class": "js-ask-val live-quotes__colored"})
-    #     asking = float(ask[60].text)
-    #     bid = soup.find_all('td',{"class": "js-bid-val live-quotes__colored"})
-    #     bidding=float(bid[60].text)
-    # except:
-    #     bidding=1.0000
-    #     asking=1.0000
+async def polygonLive():
+    async with websockets.connect('wss://socket.polygon.io/forex') as websocket:
+        await websocket.recv()
+        await websocket.send(json.dumps(authenticatePolygon))
+        await websocket.recv()
+        await websocket.send(json.dumps(pricesPolygon))
+        await websocket.recv()
+        response = await websocket.recv()
+        res = json.loads(response)
+        return res
+    
+def getPolygonLivePrices(res):
+    asking=float(res[0]['a'])
+    bidding=float(res[0]['b'])
 
     return bidding, asking
+
+# B2C2 Live Prices
+
+# async def listen():
+#     async with websockets.connect('wss://socket.uat.b2c2.net/quotes', extra_headers=headersB2C2) as websocket:
+#         await websocket.recv()
+#         await websocket.send(json.dumps(data))
+#         await websocket.recv()
+#         response = await websocket.recv()
+#         res = json.loads(response)
+#         #print(res['levels']['buy'][0]['price'])
+#         return res
+
+# def getB2C2PricesBuy(res):
+#     buy1 = float(res['levels']['buy'][0]['price'])
+#     buy2 = float(res['levels']['buy'][1]['price'])
+#     buy3 = float(res['levels']['buy'][2]['price'])
+#     buy4 = float(res['levels']['buy'][3]['price'])
+#     buy5 = float(res['levels']['buy'][4]['price'])
+
+#     return buy1, buy2, buy3, buy4, buy5
+
+# def getB2C2PricesSell(res):
+#     sell1 = float(res['levels']['sell'][0]['price'])
+#     sell2 = float(res['levels']['sell'][1]['price'])
+#     sell3 = float(res['levels']['sell'][2]['price'])
+#     sell4 = float(res['levels']['sell'][3]['price'])
+#     sell5 = float(res['levels']['sell'][4]['price'])
+
+#     return sell1, sell2, sell3, sell4, sell5
+
 
 def getNews(news='Crypto'):
     google_news = GNews(period='1h', max_results=10)
@@ -342,11 +382,9 @@ figFwdPoints = go.Figure(data=[go.Table(
 
 figFwdPoints.update_layout(margin=dict(l=0, r=0, b=0,t=0), width=385, height=50)
 
-###Dash Styling
 
 ###Dash Components
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
-server = app.server
 
 mytitle = dcc.Markdown(id='my-title', children='Luno Trading Dashboard')
 usdtZar = dcc.Graph(id='usdtZar', figure={})
@@ -360,8 +398,8 @@ bidInput = dbc.Input(id="bidInput", type="number", min=0.0001, max=50.0000, step
 offerInput = dbc.Input(id="offerInput", type="number", min=0.0001, max=50.0000, step=0.00001, value='{:.4f}'.format(initial_ask), placeholder="Sell At", className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
 usdtVolInput = dbc.Input(id="usdtVolInput", type="number", min=1, max=100000, step=1, value=10000, placeholder="USDT VOL", className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
 btcVolInput = dbc.Input(id="btcVolInput", type="number", min=0.01, max=50.00, step=0.01, value=1, placeholder="BTC VOL", className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
-brokerVolume1 = dbc.Input(id="brokerVol1", type="number", min=1, max=100000, step=1, value=10000, placeholder="Vol1", className='text-center', style={'width':'7vw', 'height': '2.2vh','margin-bottom':'5px'})
-brokerVolume2 = dbc.Input(id="brokerVol2", type="number", min=1, max=100000, step=1, value=20000, placeholder="Vol2", className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
+brokerVolume1 = dbc.Input(id="brokerVol1", type="number", min=1, max=100000, step=1, value=5000, placeholder="Vol1", className='text-center', style={'width':'7vw', 'height': '2.2vh','margin-bottom':'5px'})
+brokerVolume2 = dbc.Input(id="brokerVol2", type="number", min=1, max=100000, step=1, value=10000, placeholder="Vol2", className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
 keyInput = dbc.Input(id="keyInput", type="text", valid=True, placeholder="Keyword", value='Crypto', debounce=False, className='text-center', style={'width':'7vw', 'height': '2.2vh', 'margin-bottom':'5px'})
 
 brokerProvider = [
@@ -425,14 +463,6 @@ countryProvider = [
     ),
 ]
 
-# countryProviderBTC = [
-#     dbc.CardBody(
-#         [
-#             html.H1("COUNTRY", style={"color": "MidnightBlue", "font-size": "12px"}, className="card-title text-center"),
-#             html.P("Premium",style={"color": "MidnightBlue","font-size": "9px", "margin-left":"4px","margin-bottom":"3px", 'margin-top':'0px'}, className="card-text text-center"),
-#         ], style={"color": "white" ,"background-color": "PaleGoldenRod"}
-#     ),
-# ]
 
 premiumProvider = [
     dbc.CardHeader("Calculation",style={"color": "WhiteSmoke","background-color": "PaleVioletRed", "font-size": "15px"}, id='premiumProviderHeader', className="text-center"),
@@ -509,15 +539,6 @@ countryBid = [
 ]
 
 
-# countryBidBTC = [
-#     dbc.CardBody(
-#         [
-#             html.H1(style={"color": "green", "font-size": "12px", 'margin-top':'0px', 'margin-bottom':'0px'}, className="card-title text-center"),
-#             html.I(style={"color": "green", "font-size": "9px", "margin-left":"35px", 'margin-top':'0px', 'margin-bottom':'0px'}, className="bi bi-caret-up-fill"),
-#         ], style={"color": "white" ,"background-color": "PaleGoldenRod"}
-#     ),
-# ]
-
 premiumBid = [
     dbc.CardHeader("Bid",style={"color": "WhiteSmoke","background-color": "PaleVioletRed", "font-size":'15px'}, id='premiumBidHeader', className="text-center"),
     dbc.CardBody(
@@ -590,14 +611,6 @@ countryOffer = [
     ),
 ]
 
-# countryOfferBTC = [
-#     dbc.CardBody(
-#         [
-#             html.H1(style={"color": "darkred", "font-size": "12px", 'margin-top':'0px', 'margin-bottom':'0px'}, className="card-title text-center"),
-#             html.I(style={"color": "darkred", "margin-left":"25px","font-size": "9px", 'margin-top':'0px', 'margin-bottom':'0px'}, className="bi bi-caret-down-fill")
-#         ], style={"color": "white" ,"background-color": "PaleGoldenRod"}
-#     ),
-# ]
 
 premiumOffer = [
     dbc.CardHeader("Ask", style={"color": "WhiteSmoke","background-color": "PaleVioletRed", "font-size":'15px'},id='premiumOfferHeader', className="text-center"),
@@ -612,15 +625,27 @@ premiumOffer = [
 
 myInterval = dcc.Interval(
     id='interval-component',
-    interval=60*1000, # in milliseconds
+    interval=30*1000, # in milliseconds
     n_intervals=0
 )
 
 myIntervalReal = dcc.Interval(
     id='interval-component-real',
-    interval=6*1000, # in milliseconds
+    interval=2*1000, # in milliseconds
     n_intervals=0
 )
+
+myIntervalPolygon= dcc.Interval(
+    id='interval-component-poly',
+    interval=2*1000, # in milliseconds
+    n_intervals=0
+)
+
+# myIntervalB2C2= dcc.Interval(
+#     id='interval-component-b2c2',
+#     interval=5*1000, # in milliseconds
+#     n_intervals=0
+# )
 
 myIntervalNews = dcc.Interval(
     id='interval-component-news',
@@ -645,11 +670,12 @@ newsFeed = [
 
 ###Dash Layout
 #app.layout = dbc.Container([
-
 app.layout = html.Div([
     dbc.Row([
-        dbc.Col(html.Img(src=image_path,style={'height':'50%', 'width':'12.5%', "margin-left": 560, 'margin-bottom':'0px','margin-top':'12px'}), width=3),
-        dbc.Col([html.H1('LUNO Trading Dashboard', style={'fontSize': 45, "margin-left": 165, 'margin-bottom':'50px','margin-top':'15px'})], width=9)
+        dbc.Col([html.Br()], width=({"size":1, "order": 1}), style={'width': '10vw', 'height': '0vh'}),
+        dbc.Col(html.Img(src=image_path,style={'height':'50%', 'width':'12.5%', "margin-left": '375px', 'margin-bottom':'75px','margin-top':'12px'}), width=({"size":3, "order": 1})),
+        dbc.Col([html.H1('LUNO Trading Dashboard', style={'color': 'lightBlue', 'fontSize': 45, "margin-left": '0px', "margin-right": '0px', 'margin-bottom':'75px','margin-top':'15px'})], width=({"size":12, "order": 1}), style={'width': '30vw', 'height': '0vh'}),
+        dbc.Col(de.Lottie(options=options, width="50%", height="50%", url=lottieUrl), width=({"size":1, "order": 1})),
     ]),
 
     dbc.Row([
@@ -747,6 +773,12 @@ app.layout = html.Div([
     dbc.Row([
         dbc.Col([myIntervalReal], width=9)
     ]),
+    # dbc.Row([
+    #     dbc.Col([myIntervalB2C2], width=9)
+    # ]),
+    dbc.Row([
+        dbc.Col([myIntervalPolygon], width=9)
+    ]),
         dbc.Row([
         dbc.Col([myIntervalNews], width=9)
     ]),
@@ -759,54 +791,58 @@ app.layout = html.Div([
     dcc.Store(id='btcVolAmount'),
     dcc.Store(id='usdtVolAmount'),
 
-    dcc.Store(id='btcBidBrokerPrev', data=1),
-    dcc.Store(id='btcBidBrokerCurrent', data=1),
+######
+    dcc.Store(id='btcBidBrokerPrev'),
+    dcc.Store(id='btcBidBrokerCurrent'),
 
-    dcc.Store(id='btcOfferBrokerPrev', data=1),
-    dcc.Store(id='btcOfferBrokerCurrent', data=1),
+    dcc.Store(id='btcOfferBrokerPrev'),
+    dcc.Store(id='btcOfferBrokerCurrent'),
 
-    dcc.Store(id='btcBidValrPrev', data=1),
-    dcc.Store(id='btcBidValrCurrent', data=1),
+    dcc.Store(id='btcBidValrPrev'),
+    dcc.Store(id='btcBidValrCurrent'),
     
-    dcc.Store(id='btcOfferValrPrev', data=1),
-    dcc.Store(id='btcOfferValrCurrent', data=1),
+    dcc.Store(id='btcOfferValrPrev'),
+    dcc.Store(id='btcOfferValrCurrent'),
 
 
-    dcc.Store(id='usdtBidBrokerPrev', data=1),
-    dcc.Store(id='usdtBidBrokerCurrent', data=1),
+    dcc.Store(id='usdtBidBrokerPrev'),
+    dcc.Store(id='usdtBidBrokerCurrent'),
 
-    dcc.Store(id='usdtOfferBrokerPrev', data=1),
-    dcc.Store(id='usdtOfferBrokerCurrent', data=1),
+    dcc.Store(id='usdtOfferBrokerPrev'),
+    dcc.Store(id='usdtOfferBrokerCurrent'),
 
-    dcc.Store(id='usdtBidValrPrev', data=1),
-    dcc.Store(id='usdtBidValrCurrent', data=1),
+    dcc.Store(id='usdtBidValrPrev'),
+    dcc.Store(id='usdtBidValrCurrent'),
     
-    dcc.Store(id='usdtOfferValrPrev', data=1),
-    dcc.Store(id='usdtOfferValrCurrent', data=1),
+    dcc.Store(id='usdtOfferValrPrev'),
+    dcc.Store(id='usdtOfferValrCurrent'),
 
-    dcc.Store(id='fxBidPrev', data=1),
-    dcc.Store(id='fxBidCurrent', data=1),
+    dcc.Store(id='fxLiveDict'),
+
+    dcc.Store(id='fxBidPrev'),
+    dcc.Store(id='fxBidCurrent'),
     
-    dcc.Store(id='fxOfferPrev', data=1),
-    dcc.Store(id='fxOfferCurrent', data=1),
+    dcc.Store(id='fxOfferPrev'),
+    dcc.Store(id='fxOfferCurrent'),
 
-    dcc.Store(id='impliedBidPrev', data=1),
-    dcc.Store(id='impliedBidCurrent', data=1),
+    dcc.Store(id='b2c2Dict'),
+
+    dcc.Store(id='impliedBidPrev'),
+    dcc.Store(id='impliedBidCurrent'),
     
-    dcc.Store(id='impliedOfferPrev', data=1),
-    dcc.Store(id='impliedOfferCurrent', data=1),
+    dcc.Store(id='impliedOfferPrev'),
+    dcc.Store(id='impliedOfferCurrent'),
 
-    dcc.Store(id='computedBidPrev', data=1),
-    dcc.Store(id='computedBidCurrent', data=1),
+    dcc.Store(id='computedBidPrev'),
+    dcc.Store(id='computedBidCurrent'),
     
-    dcc.Store(id='computedOfferPrev', data=1),
-    dcc.Store(id='computedOfferCurrent', data=1),
-
+    dcc.Store(id='computedOfferPrev'),
+    dcc.Store(id='computedOfferCurrent'),
+#####
 ])
 
 
 ###Dash Callbacks
-
 
 #Get NewsDataframe
 @callback(Output('newsDF', 'data'), Input('interval-component-news', 'n_intervals'), Input('keyInput', 'value'))
@@ -844,7 +880,10 @@ def UpdatesbtcBrokerMoveBid(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -870,7 +909,10 @@ def UpdatesbtcValrMoveBid(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -896,7 +938,10 @@ def UpdatesbtcBrokerMoveOffer(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -922,7 +967,10 @@ def UpdatesbtcValrMoveOffer(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -949,7 +997,10 @@ def UpdatesUsdtBrokerMoveBid(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -975,7 +1026,10 @@ def UpdatesUsdtValrMoveBid(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1001,7 +1055,10 @@ def UpdatesUsdtBrokerMoveOffer(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'px'}
@@ -1027,7 +1084,10 @@ def UpdatesUsdtValrMoveOffer(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1053,7 +1113,10 @@ def UpdatesForexMoveBid(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"25px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1079,7 +1142,10 @@ def UpdatesForexMoveOffer(prev, curr):
     if (curr <= 1):
         curr = prev
 
-    move = ((float(curr) - float(prev)) / float(prev))
+    try:
+        move = ((float(curr) - float(prev)) / float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"25px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1097,7 +1163,6 @@ def UpdatesForexMoveOffer(prev, curr):
     return '{:.4%}'.format(move), style2, cName, style1, curr
 
 
-
 #Update Mkt Implied bid
 @callback(Output('mktImpliedBidIcon', 'children'), Output('mktImpliedBidIcon', 'style'), Output('mktImpliedBidIcon', 'className'),
           Output('mktImpliedBid', 'style'), Output('impliedBidPrev', 'data'), 
@@ -1107,7 +1172,10 @@ def UpdatesMktImpliedMoveBid(prev, curr):
     # if (curr <= 1):
     #     curr = prev
 
-    move = (float(curr) - float(prev))
+    try:
+        move = (float(curr) - float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1133,19 +1201,23 @@ def UpdatesMktImpliedMoveOffer(prev, curr):
     # if (curr <= 1):
     #     curr = prev
 
-    move = (float(curr) - float(prev))
+    try:
+        move = (float(curr) - float(prev))
+    except:
+        move=0
+
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
-        style1={"color": "green", "font-size": "12px", 'margin-top':'10px', 'margin-bottom':'0px'}
+        style1={"color": "green", "font-size": "12px", 'margin-top':'10.5px', 'margin-bottom':'0px'}
         cName="bi bi-graph-up-arrow"
     elif(move < 0):
         style2={"color": "darkred", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
-        style1={"color": "darkred", "font-size": "12px", 'margin-top':'10px', 'margin-bottom':'0px'}
+        style1={"color": "darkred", "font-size": "12px", 'margin-top':'10.5px', 'margin-bottom':'0px'}
         cName="bi bi-graph-down-arrow"
     else:
         style2={"color": "green", "font-size": "9px", "margin-left":"30px", 'margin-top':'0px', 'margin-bottom':'0px'}
-        style1={"color": "green", "font-size": "12px", 'margin-top':'10px', 'margin-bottom':'0px'}
+        style1={"color": "green", "font-size": "12px", 'margin-top':'10.5px', 'margin-bottom':'0px'}
         cName=""
 
     return '{:.2%}'.format(move), style2, cName, style1, curr
@@ -1160,7 +1232,10 @@ def UpdatesComputedMoveBid(prev, curr):
     # if (curr <= 1):
     #     curr = prev
 
-    move = (float(curr) - float(prev))
+    try:
+        move = (float(curr) - float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px",'margin-top':'0px', 'margin-bottom':'0px'}
@@ -1186,19 +1261,22 @@ def UpdatesComputedMoveBid(prev, curr):
 def UpdatesComputedMoveOffer(prev, curr):
     # if (curr <= 1):
     #     curr = prev
-    move = (float(curr) - float(prev))
+    try:
+        move = (float(curr) - float(prev))
+    except:
+        move=0
 
     if(move > 0):
         style2={"color": "green", "font-size": "9px", "margin-left":"30px",'margin-top':'px', 'margin-bottom':'0px'}
-        style1={"color": "green", "font-size": "12px",'margin-top':'1px', 'margin-bottom':'0px'}
+        style1={"color": "green", "font-size": "12px",'margin-top':'0.5px', 'margin-bottom':'0px'}
         cName="bi bi-graph-up-arrow"
     elif(move < 0):
         style2={"color": "darkred", "font-size": "9px", "margin-left":"30px",'margin-top':'0px', 'margin-bottom':'0px'}
-        style1={"color": "darkred", "font-size": "12px",'margin-top':'1px', 'margin-bottom':'0px'}
+        style1={"color": "darkred", "font-size": "12px",'margin-top':'0.5px', 'margin-bottom':'0px'}
         cName="bi bi-graph-down-arrow"
     else:
         style2={"color": "green", "font-size": "9px", "margin-left":"30px",'margin-top':'0px', 'margin-bottom':'0px'}
-        style1={"color": "green", "font-size": "12px",'margin-top':'1px', 'margin-bottom':'0px'}
+        style1={"color": "green", "font-size": "12px",'margin-top':'0.5px', 'margin-bottom':'0px'}
         cName=""
 
     return '{:.2%}'.format(move), style2, cName, style1, curr
@@ -1218,12 +1296,6 @@ def updateUsdtVol(vol):
     units = str(volume)+'k'
     return vol, units, units
 
-
-# #Get NewsDataframe
-# @callback(Output('newsDF', 'data'), Input('interval-component-news', 'n_intervals'), Input('keyInput', 'value'))
-# def UpdateNewsDf(n, key):
-#     articles, url = getNews(key)
-#     return articles, url
 
 @callback(Output('newsfeed1', 'children'), Output('newsfeed2', 'children'),
           Output('newsfeed1', 'href'), Output('newsfeed2', 'href'),
@@ -1273,12 +1345,33 @@ def update_lunoPrices(df1,df2, vol1, vol2):
 
 
 # Forex Price
+
+@callback(Output('fxLiveDict', 'data'), Input('interval-component-poly', 'n_intervals'))
+def update_PolygonPrices(n):
+    
+    #prices = asyncio.get_event_loop().run_until_complete(listen())
+    prices = asyncio.run(polygonLive())
+
+    return prices
+
 @callback(Output('investing-zarBid', 'children'), Output('investing-zarOffer', 'children'),
           Output('fxBidCurrent', 'data'), Output('fxOfferCurrent', 'data'),
-          Input('interval-component-real', 'n_intervals'))
-def update_ForexPrices(n):
-    zarUsdBid, zarUsdAsk = getLiveInvesting()
+          Input('fxLiveDict', 'data'))
+def update_ForexPrices(res):
+    zarUsdBid, zarUsdAsk = getPolygonLivePrices(res)
     return '{:,.4f}'.format(zarUsdBid), '{:,.4f}'.format(zarUsdAsk), float(zarUsdBid), float(zarUsdAsk)
+
+
+# B2C2 Prices
+
+# @callback(Output('b2c2Dict', 'data'), Input('interval-component-b2c2', 'n_intervals'))
+# def update_B2C2Prices(n):
+    
+#     #prices = asyncio.get_event_loop().run_until_complete(listen())
+#     prices = asyncio.run(listen())
+
+#     return prices
+
 
 # Mkt Implied Premium Price
 @callback(Output('mktImpliedBid', 'children'), Output('mktImpliedOffer', 'children'),
@@ -1308,13 +1401,20 @@ def Update_computed(usdtBid, usdtOffer, fxBid, fxOffer):
 
 # Graph Updates
 @callback(Output('usdtZar', 'figure'), Output('btcZar', 'figure'), Output('zarUsd', 'figure'), 
-          Output('premiumPair', 'figure'), Output('b2c2Trades', 'figure'), Input('interval-component', 'n_intervals'))
+          Output('premiumPair', 'figure'),
+          #Output('b2c2Trades', 'figure'),
+          Input('interval-component', 'n_intervals'))
 
 def update_graph_live(n):
 
     lunoCandles = candles(currencyPairs, timeLag)
     fxUsd = currencyUSD(tickerStrings)
     df=premiumCalcs(lunoCandles, fxUsd)
+
+    length = df.shape[0]
+    len25 = int(length*0.25)
+    len50 = int(length*0.5)
+    len75 = int(length*0.75)
 
     ##USDT/ZAR Pair
 
@@ -1333,26 +1433,37 @@ def update_graph_live(n):
 
     figUsdtZar.add_trace(go.Scatter(x=[df.index[-1]],
                          y=[df['USDTZAR'].iloc[-1]],
-                         text=['{:,.2f}'.format(df['USDTZAR'].iloc[-1])],
-                         mode='markers+text',
-                         marker=dict(color='darkblue', size=9),
-                         textfont=dict(color='darkblue', size=12),
-                         textposition='bottom left',
-                         showlegend=False))
+                         #text=['{:,.2f}'.format(df['USDTZAR'].iloc[-1])],
+                         name=str('{:,.2f}'.format(df['USDTZAR'].iloc[-1])),
+                         mode='markers',
+                         marker=dict(color='darkmagenta', size=9, symbol='star-triangle-up'),
+                         textfont=dict(color='darkmagenta', size=12),
+                         textposition='top left',
+                         showlegend=True))
 
     figUsdtZar.update_layout(
         template=theme,
         width=420,
         height=190,
+        legend=dict(
+        orientation="h",
+        y=1.2,
+        x=0),
+        # paper_bgcolor=bg_color,
+        # plot_bgcolor=plot_bgColor,
         xaxis=dict(autorange=True,
                 title_text='Time',
                 title_font=dict(size=9),
-                showticklabels=False),
+                tickvals = [df.index[0], df.index[len25], df.index[len50], df.index[len75], df.index[length-1]],
+                ticktext = [df.index[0].strftime("%H:%M"), df.index[len25].strftime("%H:%M"),
+                            df.index[len50].strftime("%H:%M"), df.index[len75].strftime("%H:%M"),
+                            df.index[length-1].strftime("%H:%M")],
+                showticklabels=True),
         yaxis=dict(autorange=True,
                 title_text='USDT/ZAR',
                 title_font=dict(size=9),
                 tickfont = dict(size=9)),
-        margin=dict (l=50, r=50, t=50, b=50),
+       margin=dict (l=50, r=50, t=50, b=50),
         title='<b>USDT/ZAR<b>',
         title_font=dict(size=15,
                     color='grey',
@@ -1360,6 +1471,9 @@ def update_graph_live(n):
         title_x=0.5, 
         title_y=0.95,
     )
+
+    #figUsdtZar.update_xaxes(showgrid=True, gridwidth=1, gridcolor='LightGrey')
+    #figUsdtZar.update_yaxes(showgrid=True, gridwidth=1, gridcolor='LightGrey')
     
     ##BTC/ZAR Pair
 
@@ -1377,21 +1491,32 @@ def update_graph_live(n):
 
     figBtcZar.add_trace(go.Scatter(x=[df.index[-1]],
                          y=[df['XBTZAR'].iloc[-1]],
-                         text=['{:,.0f}'.format(df['XBTZAR'].iloc[-1])],
-                         mode='markers+text',
-                         marker=dict(color='darkred', size=9),
-                         textfont=dict(color='darkred', size=12),
-                         textposition='bottom left',
-                         showlegend=False))
+                         #text=['{:,.0f}'.format(df['XBTZAR'].iloc[-1])],
+                         name=str('{:,.0f}'.format(df['XBTZAR'].iloc[-1])),
+                         mode='markers',
+                         marker=dict(color='orangered', size=9, symbol='circle'),
+                         textfont=dict(color='orangered', size=12),
+                         textposition='top left',
+                         showlegend=True))
 
 
     figBtcZar.update_layout(
         template=theme,
         width=420,
         height=190,
+        legend=dict(
+        orientation="h",
+        y=1.2,
+        x=0),
+        # paper_bgcolor=bg_color,
+        # plot_bgcolor=plot_bgColor,
         xaxis=dict(autorange=True,
                 title_text='Time',
-                showticklabels=False,
+                tickvals = [df.index[0], df.index[len25], df.index[len50], df.index[len75], df.index[length-1]],
+                ticktext = [df.index[0].strftime("%H:%M"), df.index[len25].strftime("%H:%M"),
+                            df.index[len50].strftime("%H:%M"), df.index[len75].strftime("%H:%M"),
+                            df.index[length-1].strftime("%H:%M")],
+                showticklabels=True,
                 title_font=dict(size=9)
                 ),
         yaxis=dict(autorange=True,
@@ -1423,21 +1548,32 @@ def update_graph_live(n):
 
     figZarUsd.add_trace(go.Scatter(x=[df.index[-1]],
                          y=[df['ZARUSD'].iloc[-1]],
-                         text=['{:.2f}'.format(df['ZARUSD'].iloc[-1])],
-                         mode='markers+text',
-                         marker=dict(color='darkred', size=9),
-                         textfont=dict(color='darkred', size=12),
-                         textposition='bottom left',
-                         showlegend=False))
+                         #text=['{:.2f}'.format(df['ZARUSD'].iloc[-1])],
+                         name=str('{:,.2f}'.format(df['ZARUSD'].iloc[-1])),
+                         mode='markers',
+                         marker=dict(color='crimson', size=9, symbol='hexagram'),
+                         textfont=dict(color='crimson', size=12),
+                         textposition='top left',
+                         showlegend=True))
 
 
     figZarUsd.update_layout(
         template=theme,
         width=420,
         height=190,
+        legend=dict(
+        orientation="h",
+        y=1.2,
+        x=0),
+        # paper_bgcolor=bg_color,
+        # plot_bgcolor=plot_bgColor,
         xaxis=dict(autorange=True,
                 title_text='Time',
-                showticklabels=False,
+                tickvals = [df.index[0], df.index[len25], df.index[len50], df.index[len75], df.index[length-1]],
+                ticktext = [df.index[0].strftime("%H:%M"), df.index[len25].strftime("%H:%M"),
+                            df.index[len50].strftime("%H:%M"), df.index[len75].strftime("%H:%M"),
+                            df.index[length-1].strftime("%H:%M")],
+                showticklabels=True,
                 title_font=dict(size=9)
                 ),
         yaxis=dict(autorange=True,
@@ -1472,21 +1608,32 @@ def update_graph_live(n):
 
     figPremium.add_trace(go.Scatter(x=[df.index[-1]],
                          y=[df['USDT Premium'].iloc[-1]],
-                         text=['{:.2%}'.format(df['USDT Premium'].iloc[-1])],
-                         mode='markers+text',
-                         marker=dict(color='purple', size=9),
-                         textfont=dict(color='purple', size=12),
-                         textposition='bottom left',
-                         showlegend=False))
+                         #text=['{:.2%}'.format(df['USDT Premium'].iloc[-1])],
+                         name=str('{:,.2%}'.format(df['USDT Premium'].iloc[-1])),
+                         mode='markers',
+                         marker=dict(color='blue', size=9, symbol='star'),
+                         textfont=dict(color='blue', size=12),
+                         textposition='top left',
+                         showlegend=True))
 
 
     figPremium.update_layout(
         template=theme,
         width=420,
         height=190,
+        legend=dict(
+        orientation="h",
+        y=1.2,
+        x=0),
+        # paper_bgcolor=bg_color,
+        # plot_bgcolor=plot_bgColor,
         xaxis=dict(autorange=True,
                 title_text='Time',
-                showticklabels=False,
+                tickvals = [df.index[0], df.index[len25], df.index[len50], df.index[len75], df.index[length-1]],
+                ticktext = [df.index[0].strftime("%H:%M"), df.index[len25].strftime("%H:%M"),
+                            df.index[len50].strftime("%H:%M"), df.index[len75].strftime("%H:%M"),
+                            df.index[length-1].strftime("%H:%M")],
+                showticklabels=True,
                 title_font=dict(size=9)
                 ),
         yaxis=dict(autorange=True,
@@ -1503,51 +1650,13 @@ def update_graph_live(n):
         title_y=0.95,  
     )
 
-    ##B2C2 Trades
-
-    head = ['<b>Volume<b>', '<b>Bid<b>', '<b>Offer<b>']
-    labels = ['100k', '200k', '300k', '400k', '500k']
-
-    offshore100bid= ['{:,}'.format(offshoreBid100)]
-    offshore200bid= ['{:,}'.format(offshoreBid200)]
-    offshore300bid= ['{:,}'.format(offshoreBid300)]
-    offshore400bid= ['{:,}'.format(offshoreBid400)]
-    offshore500bid= ['{:,}'.format(offshoreBid500)]
-
-    offshore100offer  = ['{:,}'.format(offshoreOffer100)]
-    offshore200offer  = ['{:,}'.format(offshoreOffer200)]
-    offshore300offer  = ['{:,}'.format(offshoreOffer300)]
-    offshore400offer  = ['{:,}'.format(offshoreOffer400)]
-    offshore500offer  = ['{:,}'.format(offshoreOffer500)]
-
-    bidpoints = [offshore100bid, offshore200bid,offshore300bid,offshore400bid,offshore500bid]
-    offerpoints = [offshore100offer, offshore200offer, offshore300offer, offshore400offer, offshore500offer]
-
-    figB2C2Trades = go.Figure(data=[go.Table(
-        header=dict(values=head,
-                    fill_color='#4678A8',
-                    align='center',
-                    line_color='lightgrey',
-                    font=dict(color='white', size=12)),
-        cells=dict(values=[labels, bidpoints, offerpoints],
-                fill_color='rgb(242,242,242)',
-                align='center',
-                line_color='lightgrey',
-                font=dict(color='black', size=11)))
-    ])
-
-    figB2C2Trades.update_layout(margin=dict(l=0, r=0, b=0,t=0), width=385, height=130)
-
-    return figUsdtZar, figBtcZar, figZarUsd, figPremium, figB2C2Trades
-
+    return figUsdtZar, figBtcZar, figZarUsd, figPremium
 
 
 ##Broker Trades
 @callback(Output('brokerTrades', 'figure'), Input('brokerVol1', 'value'),
           Input('brokerVol2', 'value'), Input('usdtLunoDf', 'data'))
 def UpdateBrokerTable(vol1, vol2, df):
-
-    #patched_fig = Patch()
 
     volume1= round(vol1/1000,1)
     units1 = str(volume1)+'k'
@@ -1585,6 +1694,45 @@ def UpdateBrokerTable(vol1, vol2, df):
     figBrokerTrades.update_layout(margin=dict(l=0, r=0, b=0,t=0), width=385, height=70)
 
     return figBrokerTrades
+
+
+##B2C2 Trades
+@callback(Output('b2c2Trades', 'figure'), Input('b2c2Dict', 'data'))
+def updateB2C2Graph(df):
+
+    head = ['<b>Volume<b>', '<b>Bid<b>', '<b>Offer<b>']
+    labels = ['100k', '200k', '300k', '400k', '500k']
+
+    # offshore100bid, offshore200bid, offshore300bid, offshore400bid, offshore500bid = getB2C2PricesBuy(df)
+    # offshore100offer, offshore200offer, offshore300offer, offshore400offer, offshore500offer = getB2C2PricesSell(df)
+
+    offshore100bid, offshore200bid, offshore300bid, offshore400bid, offshore500bid = 0, 0, 0, 0, 0
+    offshore100offer, offshore200offer, offshore300offer, offshore400offer, offshore500offer = 0, 0, 0, 0, 0
+
+    bidpoints = ['{:,.3f}'.format(offshore100bid), '{:,.3f}'.format(offshore200bid),
+                 '{:,.3f}'.format(offshore300bid),'{:,.3f}'.format(offshore400bid),
+                 '{:,.3f}'.format(offshore500bid)]
+    offerpoints = ['{:,.3f}'.format(offshore100offer), '{:,.3f}'.format(offshore200offer),
+                   '{:,.3f}'.format(offshore300offer),
+                   '{:,.3f}'.format(offshore400offer),
+                   '{:,.3f}'.format(offshore500offer)]
+
+    figB2C2Trades = go.Figure(data=[go.Table(
+        header=dict(values=head,
+                    fill_color='#4678A8',
+                    align='center',
+                    line_color='lightgrey',
+                    font=dict(color='white', size=12)),
+        cells=dict(values=[labels, bidpoints, offerpoints],
+                fill_color='rgb(242,242,242)',
+                align='center',
+                line_color='lightgrey',
+                font=dict(color='black', size=11)))
+    ])
+
+    figB2C2Trades.update_layout(margin=dict(l=0, r=0, b=0,t=0), width=385, height=130)
+
+    return figB2C2Trades
 
 
 
@@ -1633,12 +1781,6 @@ def changeValrOfferStyle(is_open):
         return {"color": "white" , "background-color": "Thistle"}
     else:
         return {"color": "white" , "background-color": "PeachPuff"}
-    
-
-
-#####################################################################
-#####################################################################
-
 
 @callback(Output('brokerProviderHeader', 'style'), Output('brokerProviderBody', 'style'), Input('brokerProviderHover', 'is_open'))
 def changeBrokerProviderStyle1(is_open):
@@ -1686,11 +1828,6 @@ def changeValrOfferStyle1(is_open):
     else:
         return {"color": "white" , "background-color": "PeachPuff"}
 
-
-
-######################################################################
-######################################################################
-
 @callback(Output('forexProviderHeader', 'style'), Output('forexProviderBody', 'style'), Input('forexProviderHover', 'is_open'))
 def changeForexProviderStyle(is_open):
     if is_open:
@@ -1713,9 +1850,6 @@ def changeForexOfferStyle(is_open):
         return {"color": "WhiteSmoke","background-color": "Purple", "font-size":'15px'}, {"color": "white" ,"background-color": "Thistle"}
     else:
         return {"color": "WhiteSmoke","background-color": "DarkSeaGreen", "font-size":'15px'}, {"color": "white" ,"background-color": "lavenderblush"}
-
-######################################################################
-######################################################################
 
 @callback(Output('countryProviderHeader', 'style'), Output('countryProviderBody', 'style'), Input('countryProviderHover', 'is_open'))
 def changeCountryProviderStyle(is_open):
@@ -1741,11 +1875,6 @@ def changeCountryOfferStyle(is_open):
         return {"color": "WhiteSmoke","background-color": "DarkSeaGreen", "font-size":'15px'}, {"color": "white" ,"background-color": "lavenderblush"}
 
 
-
-######################################################################
-######################################################################
-
-
 @callback(Output('premiumProviderHeader', 'style'), Output('premiumProviderBody', 'style'), Input('premiumProviderHover', 'is_open'))
 def changeCountryProviderStyle(is_open):
     if is_open:
@@ -1768,10 +1897,7 @@ def changeCountryOfferStyle(is_open):
         return {"color": "WhiteSmoke","background-color": "Purple", "font-size":'15px'}, {"color": "white" ,"background-color": "Thistle"}
     else:
         return {"color": "WhiteSmoke","background-color": "PaleVioletRed", "font-size":'15px'}, {"color": "white" ,"background-color": "LightGoldenRodYellow"}
-
-
-######################################################################
-######################################################################
+    
 
 @callback(Output('newsFeedHeader', 'style'), Output('newsFeedBody', 'style'), Input('newsFeedHover', 'is_open'))
 def changenewsFeedStyle(is_open):
@@ -1781,10 +1907,6 @@ def changenewsFeedStyle(is_open):
         return {"font-size":'15px'}, {}
 
 
-######################################################################
-######################################################################
-
-
 #Run app
 if __name__=='__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False)
